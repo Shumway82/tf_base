@@ -1,11 +1,3 @@
-"""
-Copyright (C) Silvio Jurk - All Rights Reserved
-Unauthorized copying of this file, via any medium is strictly prohibited
-Proprietary and confidential.
-
-@author: Silvio Jurk
-"""
-
 from random import randint
 import numpy as np
 from scipy.misc import imresize

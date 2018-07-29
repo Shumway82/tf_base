@@ -1,11 +1,3 @@
-"""
-Copyright (C) Silvio Jurk - All Rights Reserved
-Unauthorized copying of this file, via any medium is strictly prohibited
-Proprietary and confidential.
-
-@author: Silvio Jurk
-"""
-
 import numpy as np
 from abc import abstractmethod, ABC
 from tfcore.utilities.cache import Cache
