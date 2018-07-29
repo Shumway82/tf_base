@@ -2,7 +2,7 @@
 Tensorflow Core Library
 
 # Pre-requiremtents
-tensorflow >= 1.8
+tensorflow >= 1.8 \
 pil
 numpy
 opencv
