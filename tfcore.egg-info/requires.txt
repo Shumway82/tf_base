@@ -1,0 +1,12 @@
+markdown
+keras
+numpy
+scikit-learn
+scipy
+matplotlib
+pytest
+scikit-image
+imageio
+pytest
+pydoc-markdown
+flake8

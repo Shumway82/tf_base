@@ -1,6 +1,5 @@
 import tensorflow as tf
-from tensorflow.contrib.layers import instance_norm
-from tensorflow.contrib.layers import batch_norm
+from tensorflow.contrib.layers import instance_norm, batch_norm, layer_norm
 import warnings
 
 
@@ -17,8 +16,10 @@ def w_scaling_layer(conv, w):
 
 def get_normalization(function_name):
     dic_normalization = {'BN': batch_norm_tf,
-                         'IN': _instance_norm,
+                         'IN': instance_norm_tf,
                          'SN': spectral_normed_weight,
+                         'LN': layer_norm_tf,
+                         'WN': weight_norm,
                          'None': None}
     return dic_normalization.get(function_name, None)
 
@@ -71,6 +72,8 @@ def spectral_normed_weight(W, u=None, num_iters=1, update_collection=None, with_
     else:
         return W_bar
 
+def weight_norm():
+    print (' [*] Weight-Norm ')
 
 def _instance_norm(x, training=False, reuse=False, scope=None):
     with tf.variable_scope('instance_norm', reuse=reuse):
@@ -79,14 +82,30 @@ def _instance_norm(x, training=False, reuse=False, scope=None):
         normalized = (x - mean) / (tf.sqrt(sigma) + eps)
         return  normalized
 
+def _instance_norm(x):
+    """Adapted from https://github.com/hardikbansal/CycleGAN."""
+    with tf.variable_scope("instance_norm"):
+        epsilon = 1e-5
+        mean, var = tf.nn.moments(x, [1, 2], keep_dims=True)
+        scale = tf.get_variable('scale', [x.get_shape()[-1]],
+                                initializer=tf.truncated_normal_initializer(mean=1.0, stddev=0.02))
+        offset = tf.get_variable('offset', [x.get_shape()[-1]],
+                                 initializer=tf.constant_initializer(0.0))
+        out = scale * tf.div(x - mean, tf.sqrt(var + epsilon)) + offset
+
+        return out
 
 def instance_norm_tf(x, training=False, reuse=False, scope=None):
-    return instance_norm(x, trainable=training, reuse=reuse, scope=scope)
+    return instance_norm(x, epsilon=1e-5, reuse=False, scope=scope)
 
 
 def batch_norm_tf(x, training=False, reuse=False, scope=None):
-    x = batch_norm(x, is_training=training, reuse=reuse, scope=scope)
-    return x
+    return tf.cond(training,
+                     lambda: batch_norm(x, decay=0.99, is_training=True, reuse=False, center=True, scale=True, scope=scope),
+                     lambda: batch_norm(x, decay=0.99, is_training=False, reuse=False, center=True, scale=True, scope=scope))
+
+def layer_norm_tf(x, training=False, reuse=False, scope=None):
+    return layer_norm(x, reuse=False, scope=scope)
 
 
 def normalize_weights(weights, values_range=1.0):

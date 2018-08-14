@@ -127,3 +127,15 @@ class Preprocessing():
             if img_y is not None:
                 img_y = np.clip(img_y + value, 0, 255)
             return img_x, img_y
+
+    class ToRGB(Base):
+
+        def __init__(self):
+            super().__init__()
+
+        def function(self, img_x, img_y):
+            if img_x is not None:
+                img_x = np.resize(img_x, (img_x.shape[0], img_x.shape[1], 3))
+            if img_y is not None:
+                img_y = np.resize(img_y, (img_y.shape[0], img_y.shape[1], 3))
+            return img_x, img_y

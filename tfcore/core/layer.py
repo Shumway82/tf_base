@@ -194,7 +194,6 @@ def variable_with_weight_decay(name,
     else:
         sdev = stddev
 
-
     if activation == tf.nn.selu:
         initializer = tf.random_normal_initializer(stddev=sdev, dtype=tf.float32)
     else:
@@ -204,6 +203,7 @@ def variable_with_weight_decay(name,
                           shape=shape,
                           initializer=initializer,
                           trainable=trainable)
+
     if use_weight_decay is not None:
         weight_decay = tf.multiply(tf.nn.l2_loss(var), use_weight_decay, name='weight_loss')
         tf.add_to_collection('losses', weight_decay)
@@ -267,6 +267,22 @@ def get_stddev(x, activation):
     return stddev
 
 
+def get_var_maybe_avg(var_name, ema, **kwargs):
+    ''' utility for retrieving polyak averaged params '''
+    v = tf.get_variable(var_name, **kwargs)
+    if ema is not None:
+        v = ema.average(v)
+    return v
+
+
+def get_vars_maybe_avg(var_names, ema, **kwargs):
+    ''' utility for retrieving polyak averaged params '''
+    vars = []
+    for vn in var_names:
+        vars.append(get_var_maybe_avg(vn, ema, **kwargs))
+    return vars
+
+
 def conv2d(x,
            f_out,
            k_size=3,
@@ -274,6 +290,7 @@ def conv2d(x,
            activation=linear,
            use_bias=False,
            bias_init=0.0,
+           init_scale=1.0,
            padding='SAME',
            normalization=None,
            use_spectral_norm=False,
@@ -299,6 +316,10 @@ def conv2d(x,
                                            activation=activation,
                                            stddev=0.2,
                                            trainable=trainable)
+            b = tf.get_variable('biases',
+                                [f_out],
+                                initializer=tf.constant_initializer(bias_init),
+                                trainable=trainable)
         else:
             w = set_weight
 
@@ -317,30 +338,63 @@ def conv2d(x,
                                 strides=[1, stride, stride, 1],
                                 use_cudnn_on_gpu=True,
                                 padding=padding)
+        elif normalization is weight_norm:
+            is_init = tf.Variable(True, name="init")
+            g = tf.get_variable('g', shape=[f_out], dtype=tf.float32,
+                                initializer=tf.constant_initializer(1.), trainable=True)
+
+            def init(x, w, b, g):
+                v_norm = tf.nn.l2_normalize(w, [0, 1, 2])
+                x = tf.nn.conv2d(x, v_norm, strides=[1, stride, stride, 1], padding=padding)
+                m_init, v_init = tf.nn.moments(x, [0, 1, 2])
+                scale_init = init_scale / tf.sqrt(v_init + 1e-08)
+                g = g.assign(scale_init)
+                if use_bias:
+                    b = b.assign(-m_init * scale_init)
+                x = tf.reshape(scale_init, [1, 1, 1, f_out]) * (x - tf.reshape(m_init, [1, 1, 1, f_out]))
+                is_init.assign(False)
+                return x, g
+
+            def train(x, w, b, g):
+                # use weight normalization (Salimans & Kingma, 2016)
+                W = tf.reshape(g, [1, 1, 1, f_out]) * tf.nn.l2_normalize(w, [0, 1, 2])
+
+                # calculate convolutional layer output
+                x = tf.nn.conv2d(x,
+                                 W,
+                                 strides=[1, stride, stride, 1],
+                                 use_cudnn_on_gpu=True,
+                                 padding=padding)
+
+                return x, g
+
+            conv, g = tf.cond(is_init,
+                           lambda: init(x, w, b, g),
+                           lambda: train(x, w, b, g))
+
         else:
             conv = tf.nn.conv2d(x,
                                 w,
                                 strides=[1, stride, stride, 1],
                                 use_cudnn_on_gpu=True,
                                 padding=padding)
+
         pre_activation = conv
 
         if use_wscaling:
             conv = conv * scale
 
         if use_bias:
-            biases = tf.get_variable('biases',
-                                     [f_out],
-                                     initializer=tf.constant_initializer(bias_init),
-                                     trainable=trainable)
-            pre_activation = tf.nn.bias_add(conv, biases)
+            pre_activation = tf.nn.bias_add(conv, b)
             w_count += f_out
 
-        if normalization is not None and normalization is not spectral_normed_weight:
+        if normalization is not None and \
+                normalization is not spectral_normed_weight and \
+                normalization is not weight_norm:
             pre_activation = normalization(pre_activation, training=is_training, reuse=reuse, scope=name)
 
         print(name + ': filter size: ' + str(k_size) + 'x' + str(k_size) + 'x' + str(
-            conv.get_shape()[3])  + ' shape In=' + str(
+            conv.get_shape()[3]) + ' shape In=' + str(
             x.get_shape()) + ' shape Out=' + str(conv.get_shape()) + ' weights=' + str(w_count))
 
         if not use_preactivation:
@@ -378,7 +432,6 @@ def deconv2d(x,
              use_pixel_norm=False,
              use_wscaling=False,
              name="deconv2d"):
-
     shape = [k_size, k_size, f_out, int(x.get_shape()[-1])]
     w_count = shape[0] * shape[1] * shape[2] * shape[3]
 

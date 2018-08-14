@@ -38,7 +38,7 @@ def ls_discriminator(logit, label, factor=1.0):
     if label is True:
         return tf.reduce_mean(tf.squared_difference(logit, 1)) * factor
     else:
-        return tf.reduce_mean(tf.square(logit)) * factor
+        return tf.reduce_mean(tf.squared_difference(logit, 0)) * factor
 
 def ls_generator(logit):
     """ Objective for LS-GAN
