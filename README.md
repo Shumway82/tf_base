@@ -11,7 +11,7 @@ The tf_base library is a package that includes basic functionalities that help u
 ## Installation 
 1. Clone the repository
 ```
-$ git clone git@github.com:Shumway82/tf_base.git
+$ git clone https://github.com/Shumway82/tf_base.git
 ```
 2. Go to folder
 ```
