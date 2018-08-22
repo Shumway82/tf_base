@@ -15,12 +15,10 @@ $ git clone https://github.com/Shumway82/tf_base.git
 ```
 2. Go to folder
 ```
-$ cd tf_core
+$ cd tf_base
 ```
 3. Install with pip3
 ```
-$ pip3 install tfcore
-or for editing the repository 
 $ pip3 install -e .
 ```
 
