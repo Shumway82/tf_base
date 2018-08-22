@@ -1,7 +1,10 @@
 import abc
 import cv2 as cv
+import matplotlib.pyplot as plt
 import scipy
+from skimage.measure import regionprops
 from tfcore.utilities.image import *
+from PIL import Image
 
 
 class Preprocessing():
@@ -82,6 +85,14 @@ class Preprocessing():
 
         def function(self, img_x, img_y):
             img_x = resize(img_x, (int(img_x.shape[0] / self.modes[0]), int(img_x.shape[1] / self.modes[0])), self.interp)
+
+            #cv.imshow('image', img_x)
+            #cv.waitKey(0)
+
+            #img_x = scipy.ndimage.median_filter(img_x, 5)
+
+            #cv.imshow('image', img_x)
+            #cv.waitKey(0)
             return img_x, img_y
 
     class Flip(Base):
@@ -90,11 +101,19 @@ class Preprocessing():
             super().__init__(modes=direction, shuffle=shuffle)
 
         def function(self, img_x, img_y):
+
             index = self.new_index
             if img_x is not None:
                 img_x = cv.flip(img_x, index)
             if img_y is not None:
                 img_y = cv.flip(img_y, index)
+            '''
+            try:
+                im = Image.fromarray(img_x)
+                im.save("c:/images_X/image" + str(randint(0, 9999999)) + ".jpeg")
+            except Exception:
+                print(' [!] File not found of data-set X')
+                '''
             return img_x, img_y
 
     class Rotate(Base):
@@ -105,11 +124,13 @@ class Preprocessing():
             super().__init__(modes=angle, shuffle=shuffle)
 
         def function(self, img_x, img_y):
+
             index = self.new_index
             if img_x is not None:
                 img_x = scipy.ndimage.rotate(img_x, self.modes[index], reshape=False, prefilter=False, mode='reflect')
             if img_y is not None:
                 img_y = scipy.ndimage.rotate(img_y, self.modes[index], reshape=False, prefilter=False, mode='reflect')
+
             return img_x, img_y
 
     class Brightness(Base):
@@ -126,6 +147,9 @@ class Preprocessing():
                 img_x = np.clip(img_x + value, 0, 255)
             if img_y is not None:
                 img_y = np.clip(img_y + value, 0, 255)
+
+            cv.imshow('image', img_x)
+            cv.waitKey(0)
             return img_x, img_y
 
     class ToRGB(Base):
@@ -138,4 +162,65 @@ class Preprocessing():
                 img_x = np.resize(img_x, (img_x.shape[0], img_x.shape[1], 3))
             if img_y is not None:
                 img_y = np.resize(img_y, (img_y.shape[0], img_y.shape[1], 3))
+            return img_x, img_y
+
+    class Central_Crop(Base):
+
+        def __init__(self, size=(512,512)):
+            self.crop_size = size
+            super().__init__()
+
+        def function(self, img_x, img_y):
+            if img_x is not None:
+                y, x = img_x.shape
+                startx = x // 2 - (self.crop_size[0] // 2)
+                starty = y // 2 - (self.crop_size[1] // 2)
+                img_x = img_x[starty:starty + self.crop_size[1], startx:startx + self.crop_size[0]]
+            if img_y is not None:
+                y, x = img_y.shape
+                startx = x // 2 - (self.crop_size[0] // 2)
+                starty = y // 2 - (self.crop_size[1] // 2)
+                img_y = img_y[starty:starty + self.crop_size[1], startx:startx + self.crop_size[0]]
+
+            return img_x, img_y
+
+    class Crop_by_Center(Base):
+
+        def __init__(self, treshold=25, size=(256,256)):
+            self.crop_size = size
+            self.treshold = treshold
+            super().__init__()
+
+        def function(self, img_x, img_y):
+
+            if img_x is not None:
+                _, mask = cv.threshold(img_x, np.max(img_x) - self.treshold, 255, cv.THRESH_BINARY)
+                center_of_mass = regionprops(mask, img_x)[0].centroid
+                startx = int(center_of_mass[1]) - (self.crop_size[1] // 2)
+                starty = int(center_of_mass[0]) - (self.crop_size[0] // 2)
+
+                if startx < 0:
+                    startx = 0
+                if starty < 0:
+                    starty = 0
+
+                if startx >= img_x.shape[1] - self.crop_size[1]:
+                    startx = img_x.shape[1] - self.crop_size[1]
+                if starty >= img_x.shape[1] - self.crop_size[1]:
+                    starty = img_x.shape[1] - self.crop_size[1]
+
+                img_x = img_x[starty:starty + self.crop_size[1], startx:startx + self.crop_size[0]]
+
+                if img_y is not None:
+                    img_y = img_y[starty:starty + self.crop_size[1], startx:startx + self.crop_size[0]]
+
+            #cv.imshow('image', img_x)
+            #cv.waitKey(0)
+            '''
+            try:
+                im = Image.fromarray(img_x)
+                im.save("c:/images/image" + str(randint(0, 9999999)) + ".jpeg")
+            except Exception:
+                print(' [!] File not found of data-set X')
+            '''
             return img_x, img_y

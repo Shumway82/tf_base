@@ -57,7 +57,8 @@ class IModel():
         self.gradients = []
         self.global_steps = global_steps
         self.set_optimizer()
-        self.G = None
+        self.logits = None
+        self.probs = None
         self.crl = CLR(sess,
                        start_lr=self.params.lr_lower_bound,
                        end_lr=self.params.learning_rate,
@@ -69,22 +70,22 @@ class IModel():
         """Retrieve data from the input source and return an object."""
         self.params.input_stage = input.name
 
-        self.G = self.model(input, is_train=is_train, reuse=reuse)
+        self.logits = self.model(input, is_train=is_train, reuse=reuse)
 
-        self.params.output_stage = self.G.name.split(':')[0]
+        self.params.output_stage = self.logits.name.split(':')[0]
 
         print(' [*] Input-Stage: ' + self.params.input_stage)
         print(' [*] Output-Stage: ' + self.params.output_stage)
         print(' [*] Model ' + self.params.name + ' initialized...')
-        return self.G
+        return self.logits
 
     def set_optimizer(self):
         self.learning_rate = tf.placeholder(tf.float32, shape=[])
+        #self.summary.append(tf.summary.scalar("LR_" + self.params.name, self.learning_rate))
         with tf.variable_scope(self.params.scope):
             self.optimizer = tf.train.AdamOptimizer(self.learning_rate,
                                                     beta1=self.params.beta1,
                                                     name='Adam')
-            self.summary.append(tf.summary.scalar("lr_" + self.params.scope, self.learning_rate))
 
     @abc.abstractmethod
     def model(self, input, is_train=False, reuse=False):
@@ -94,13 +95,13 @@ class IModel():
         """Retrieve data from the input source and return an object."""
         loss_function = get_loss_function(name)
         if normalize:
-            return loss_normalization(loss_function(Y, self.G))
+            return loss_normalization(loss_function(Y, self.logits))
         else:
-            return loss_function(Y, self.G)
+            return loss_function(Y, self.logits)
 
     def inference(self, input):
         """Retrieve data from the input source and return an object."""
-        return self.G.eval({self.inputs: input})
+        return self.logits.eval({self.inputs: input})
 
     def load(self, path):
         return load_model(self.sess, path, model_name=self.params.name, scope=self.params.scope)

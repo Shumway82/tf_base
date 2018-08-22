@@ -6,6 +6,35 @@ psnr = None#tf.image.psnr
 ssim = None#tf.image.ssim
 ssim_multiscale = None#tf.image.ssim_multiscale
 
+def pixel_wise_softmax(logits):
+    """
+    Pixel-wise softmax
+
+    # Arguments
+        logits: 4D-Tensor of shape (N,W,H,1)
+
+    # Return
+        4D-Tensor of shape (N,W,H,1)
+    """
+    with tf.name_scope("pixel_wise_softmax"):
+        max_axis = tf.reduce_max(logits, axis=3, keepdims=True)
+        exponential_map = tf.exp(logits - max_axis)
+        normalize = tf.reduce_sum(exponential_map, axis=3, keepdims=True)
+        return exponential_map / normalize
+
+def cross_entropy(probs, label):
+    """
+    Cross-Entropy
+
+    # Arguments
+        probs: 4D-Tensor of shape (N,W,H,1)
+        label: 4D-Tensor of shape (N,W,H,1)
+
+    # Return
+        4D-Tensor of shape (N,W,H,1)
+    """
+    #log_weight = 1 + (pos_weight - 1) * label
+    return -tf.reduce_mean(label * tf.log(tf.clip_by_value(probs, 1e-10, 1.0)), name="cross_entropy")
 
 def loss_normalization(loss, epsilon=1e-10):
     """

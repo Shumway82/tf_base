@@ -34,22 +34,24 @@ class IPipeline_Trainer_Params(ParamsSerializer):
     """
 
     def __init__(self,
-                 data_dir,
-                 validation_dir,
+                 data_dir_y,
+                 data_dir_x,
+                 validation_dir_x,
+                 validation_dir_y,
                  output_dir,
-                 data_dir_x=None,
                  convert=True,
                  resize_factor=2,
                  epochs=25,
                  batch_size=16,
                  shuffle=True,
-                 cache_size=1,
+                 cache_size=0,
                  use_high_space=False,
                  interp='bicubic'):
 
-        self.data_dir = data_dir
+        self.data_dir_y = data_dir_y
         self.data_dir_x = data_dir_x
-        self.validation_dir = validation_dir
+        self.validation_dir_x = validation_dir_x
+        self.validation_dir_y = validation_dir_y
         self.output_dir = output_dir
         self.resize_factor = resize_factor
         self.epochs = epochs
@@ -117,11 +119,22 @@ class IPipeline_Trainer(DatasetSequence):
 
         self.user_functions_code = ([], [])
 
-        self.files_y = get_img_paths(self.params.data_dir)
-        if len(self.files_y) == 0:
-            raise FileNotFoundError(' [!] No files in data-set')
+        if self.params.validation_dir_y is not None:
+            self.files_val_y = get_img_paths(self.params.validation_dir_y)
+            if len(self.files_val_y) == 0:
+                raise FileNotFoundError(' [!] No files in validation-set')
 
-        self.img_shape_y = imageio.imread(self.files_y[0]).shape
+        if self.params.validation_dir_x is not None:
+            self.files_val_x = get_img_paths(self.params.validation_dir_x)
+            if len(self.files_val_x) == 0:
+                raise FileNotFoundError(' [!] No files in validation-set')
+
+        if self.params.data_dir_y is not None:
+            self.files_y = get_img_paths(self.params.data_dir_y)
+            if len(self.files_y) == 0:
+                raise FileNotFoundError(' [!] No files in data-set')
+
+            self.img_shape_y = imageio.imread(self.files_y[0]).shape
 
         if self.params.data_dir_x is not None:
             self.files_x = get_img_paths(self.params.data_dir_x)
@@ -138,7 +151,7 @@ class IPipeline_Trainer(DatasetSequence):
         else:
             self.img_shape_x = imageio.imread(self.files_x[0]).shape
 
-        super().__init__(len(self.files_y),
+        super().__init__(len(self.files_x),
                          self.params.batch_size,
                          self.params.shuffle,
                          cache_size=self.params.cache_size)
@@ -186,3 +199,5 @@ class IPipeline_Trainer(DatasetSequence):
 
                 counter += 1
                 idx += 1
+
+        print (' [*] Training finished!!!')

@@ -48,7 +48,6 @@ class ITrainer():
                                 log_device_placement=False,
                                 gpu_options=gpu_options,
                                 device_count={'GPU': gpu_nums})
-        #config.graph_options.optimizer_options.global_jit_level = tf.OptimizerOptions.ON_1
 
         self.sess = tf.Session(config=config)
 
@@ -91,7 +90,7 @@ class ITrainer():
         os.system('tensorboard --logdir=' + self.log_dir + ' --port=8009')
         return
 
-    def make_summarys(self, gradient_list):
+    def make_summarys(self, gradient_list=[]):
 
         if self.params.make_summery_full:
             for var in tf.trainable_variables():
@@ -136,7 +135,7 @@ class ITrainer():
     def compute_tower_gradients(model, max_norm=5.0):
         model.vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope=model.params.scope)
         grads = model.optimizer.compute_gradients(model.total_loss, var_list=model.vars)
-        grads = [(tf.clip_by_norm(grad, max_norm), var) for grad, var in grads]
+        #grads = [(tf.clip_by_norm(grad, max_norm), var) for grad, var in grads]
         print(' [*] Gradients of ' + model.params.name + ' computed...')
         return grads
 
@@ -144,7 +143,6 @@ class ITrainer():
 
         if self.params.gpu:
             device = "/gpu:"
-            #device = "/job:localhost/replica:0/task:0/device:XLA_GPU:"
         else:
             device = "/cpu:"
         tower_index = 0
