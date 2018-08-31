@@ -25,13 +25,13 @@ class IPipeline_Inferencer_Params(ParamsSerializer):
     """
 
     def __init__(self,
-                 data_dir,
+                 data_dir_y,
                  data_dir_x='',
                  convert=True,
                  resize_factor=2,
                  interp='bicubic'):
 
-        self.data_dir = data_dir
+        self.data_dir_y = data_dir_y
         self.data_dir_x = data_dir_x
         self.resize_factor = resize_factor
         self.convert = convert
@@ -81,9 +81,10 @@ class IPipeline_Inferencer(DatasetSequence):
         self.params = params
         self.pre_processing = pre_processing
 
-        self.files_y = get_img_paths(self.params.data_dir)
-        if len(self.files_y) == 0:
-            raise FileNotFoundError(' [!] No files in data-set')
+        if self.params.data_dir_y != '' and self.params.data_dir_y is not None:
+            self.files_y = get_img_paths(self.params.data_dir_y)
+            if len(self.files_y) == 0:
+                raise FileNotFoundError(' [!] No files in data-set')
 
         if self.params.data_dir_x != '':
             self.files_x = get_img_paths(self.params.data_dir_x)
@@ -92,7 +93,7 @@ class IPipeline_Inferencer(DatasetSequence):
             self.params.convert = False
 
 
-        super().__init__(len(self.files_y),
+        super().__init__(len(self.files_x),
                          1,
                          False)
 

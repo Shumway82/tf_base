@@ -441,12 +441,11 @@ def deconv2d(x,
     w_count = shape[0] * shape[1] * shape[2] * shape[3]
 
     if output_shape is None:
-        # if not is_training:
-        # output_shape = [tf.shape(x)[0], tf.shape(x)[1] * stride,
-        #                    tf.shape(x)[2] * stride, int(f_out)]
-        # else:
-        output_shape = [int(x.get_shape()[0]), int(x.get_shape()[1]) * stride,
-                        int(x.get_shape()[2]) * stride, int(f_out)]
+        output_shape = []
+        output_shape.append(tf.shape(x)[0]) if tf.shape(x)[0] is tf.Dimension(None) else output_shape.append(tf.shape(x)[0])
+        output_shape.append(tf.shape(x)[1]) if tf.shape(x)[1] is tf.Dimension(None) else output_shape.append(int(x.get_shape()[1] * stride))
+        output_shape.append(tf.shape(x)[2]) if tf.shape(x)[2] is tf.Dimension(None) else output_shape.append(int(x.get_shape()[2] * stride))
+        output_shape.append(tf.shape(x)[3]) if tf.shape(x)[3] is tf.Dimension(None) else output_shape.append(int(f_out))
 
     with tf.variable_scope(name):
 
@@ -455,7 +454,8 @@ def deconv2d(x,
                                            shape=shape,
                                            activation=activation,
                                            stddev=0.2,
-                                           is_conv_transposed=True)
+                                           is_conv_transposed=True,
+                                           use_weight_decay=use_weight_decay)
         else:
             w = set_weight
 

@@ -72,8 +72,11 @@ class Preprocessing():
         def function(self, img_x, img_y):
             shape = img_x.shape
             index = self.new_index
-            img_x = resize(img_x, (int(shape[0] / self.modes[index]), int(shape[1] / self.modes[index])), self.interp)
-            img_x = resize(img_x, (int(shape[0]), int(shape[1])), self.interp)
+            if img_x is not None:
+                img_x = resize(img_x, (int(shape[0] / self.modes[index]), int(shape[1] / self.modes[index])), self.interp)
+
+            if img_y is not None:
+                img_y = resize(img_y, (int(shape[0]), int(shape[1])), self.interp)
 
             return img_x, img_y
 
@@ -84,15 +87,12 @@ class Preprocessing():
             super().__init__(modes=[factors])
 
         def function(self, img_x, img_y):
-            img_x = resize(img_x, (int(img_x.shape[0] / self.modes[0]), int(img_x.shape[1] / self.modes[0])), self.interp)
+            if img_x is not None:
+                img_x = resize(img_x, (int(img_x.shape[0] / self.modes[0]), int(img_x.shape[1] / self.modes[0])), self.interp)
 
-            #cv.imshow('image', img_x)
-            #cv.waitKey(0)
+            if img_y is not None:
+                img_y = resize(img_y, (int(img_y.shape[0] / self.modes[0]), int(img_y.shape[1] / self.modes[0])), self.interp)
 
-            #img_x = scipy.ndimage.median_filter(img_x, 5)
-
-            #cv.imshow('image', img_x)
-            #cv.waitKey(0)
             return img_x, img_y
 
     class Flip(Base):
@@ -105,15 +105,10 @@ class Preprocessing():
             index = self.new_index
             if img_x is not None:
                 img_x = cv.flip(img_x, index)
+
             if img_y is not None:
                 img_y = cv.flip(img_y, index)
-            '''
-            try:
-                im = Image.fromarray(img_x)
-                im.save("c:/images_X/image" + str(randint(0, 9999999)) + ".jpeg")
-            except Exception:
-                print(' [!] File not found of data-set X')
-                '''
+
             return img_x, img_y
 
     class Rotate(Base):
@@ -124,13 +119,20 @@ class Preprocessing():
             super().__init__(modes=angle, shuffle=shuffle)
 
         def function(self, img_x, img_y):
-
+            #cv.imshow('image_in', img_x)
+            #cv.waitKey(0)
+            #cv.imshow('image_in', img_y)
+            #cv.waitKey(0)
             index = self.new_index
             if img_x is not None:
                 img_x = scipy.ndimage.rotate(img_x, self.modes[index], reshape=False, prefilter=False, mode='reflect')
             if img_y is not None:
                 img_y = scipy.ndimage.rotate(img_y, self.modes[index], reshape=False, prefilter=False, mode='reflect')
 
+            #cv.imshow('image_out', img_x)
+            #cv.waitKey(0)
+            #cv.imshow('image_out', img_y)
+            #cv.waitKey(0)
             return img_x, img_y
 
     class Brightness(Base):
@@ -171,13 +173,22 @@ class Preprocessing():
             super().__init__()
 
         def function(self, img_x, img_y):
+
             if img_x is not None:
                 y, x = img_x.shape
+
+                if x < self.crop_size[0] and y < self.crop_size[1]:
+                    raise Exception("File size to small!")
+
                 startx = x // 2 - (self.crop_size[0] // 2)
                 starty = y // 2 - (self.crop_size[1] // 2)
                 img_x = img_x[starty:starty + self.crop_size[1], startx:startx + self.crop_size[0]]
             if img_y is not None:
                 y, x = img_y.shape
+
+                if x < self.crop_size[0] and y < self.crop_size[1]:
+                    raise Exception("File size to small!")
+
                 startx = x // 2 - (self.crop_size[0] // 2)
                 starty = y // 2 - (self.crop_size[1] // 2)
                 img_y = img_y[starty:starty + self.crop_size[1], startx:startx + self.crop_size[0]]
@@ -214,13 +225,4 @@ class Preprocessing():
                 if img_y is not None:
                     img_y = img_y[starty:starty + self.crop_size[1], startx:startx + self.crop_size[0]]
 
-            #cv.imshow('image', img_x)
-            #cv.waitKey(0)
-            '''
-            try:
-                im = Image.fromarray(img_x)
-                im.save("c:/images/image" + str(randint(0, 9999999)) + ".jpeg")
-            except Exception:
-                print(' [!] File not found of data-set X')
-            '''
             return img_x, img_y

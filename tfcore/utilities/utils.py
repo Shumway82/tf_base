@@ -161,7 +161,7 @@ def load_model(sess, model_dir, model_name, scope='generator'):
             saver = tf.train.Saver(vars_model)
             saver.restore(sess, os.path.join(model_dir, ckpt_name))
             counter = int(next(re.finditer("(\d+)(?!.*\d)", ckpt_name)).group(0))
-            print(" [*] Model load SUCCESS - " + os.path.join(model_dir, ckpt_name))
+            print(" [*] Model load SUCCESS - " + os.path.abspath(os.path.join(model_dir, ckpt_name)))
             return True, counter
     except Exception as err:
         print(" [!] Model load FAILED - " + os.path.abspath(model_dir) + ', ' + str(err))

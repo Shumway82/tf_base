@@ -2,9 +2,21 @@ import numpy as np
 import tensorflow as tf
 from keras import backend as K
 
-psnr = None#tf.image.psnr
-ssim = None#tf.image.ssim
-ssim_multiscale = None#tf.image.ssim_multiscale
+psnr = tf.image.psnr
+ssim = tf.image.ssim
+ssim_multiscale = tf.image.ssim_multiscale
+
+def accuracy(labels, probs):
+    return tf.reduce_mean(tf.cast(tf.equal(tf.argmax(labels, 1), tf.argmax(probs, 1)), tf.float32))
+
+def intersection_of_union(labels, predictions):
+    labels_predict = tf.cast(predictions, dtype=tf.float32)
+    labels = tf.cast(labels, dtype=tf.float32)
+
+    inter = tf.reduce_sum(tf.multiply(labels_predict, labels))
+    union = tf.reduce_sum(tf.subtract(tf.add(labels_predict, labels), tf.multiply(labels_predict, labels)))
+    return tf.div(inter, union)
+
 
 def pixel_wise_softmax(logits):
     """
@@ -22,6 +34,7 @@ def pixel_wise_softmax(logits):
         normalize = tf.reduce_sum(exponential_map, axis=3, keepdims=True)
         return exponential_map / normalize
 
+
 def cross_entropy(probs, label):
     """
     Cross-Entropy
@@ -33,8 +46,21 @@ def cross_entropy(probs, label):
     # Return
         4D-Tensor of shape (N,W,H,1)
     """
-    #log_weight = 1 + (pos_weight - 1) * label
+    # log_weight = 1 + (pos_weight - 1) * label
     return -tf.reduce_mean(label * tf.log(tf.clip_by_value(probs, 1e-10, 1.0)), name="cross_entropy")
+
+
+def binary_cross_entropy(output, target, epsilon=1e-8, name='bce_loss'):
+    """Binary cross entropy operation.
+
+    # Arguments
+        output : Tensor, Tensor with type of `float32` or `float64`.
+        target : Tensor, The target distribution, format the same with `output`.
+        epsilon : float, A small value to avoid output to be zero.
+        name : str, An optional name to attach to this function.
+    """
+    return tf.reduce_mean(tf.reduce_sum(-(target * tf.log(output + epsilon) + (1. - target) * tf.log(1. - output + epsilon)), axis=1), name=name)
+
 
 def loss_normalization(loss, epsilon=1e-10):
     """
@@ -68,6 +94,7 @@ def ls_discriminator(logit, label, factor=1.0):
         return tf.reduce_mean(tf.squared_difference(logit, 1)) * factor
     else:
         return tf.reduce_mean(tf.squared_difference(logit, 0)) * factor
+
 
 def ls_generator(logit):
     """ Objective for LS-GAN
@@ -161,7 +188,19 @@ def loss_dice(y, x):
     y_true_f = K.flatten(y)
     y_pred_f = K.flatten(x)
     intersection = K.sum(y_true_f * y_pred_f)
-    return (2. * intersection + smooth) / (K.sum(y_true_f) + K.sum(y_pred_f) + smooth)
+    return 1.0 - ((2. * intersection + smooth) / (K.sum(y_true_f) + K.sum(y_pred_f) + smooth))
+
+
+def loss_dice_coef_binary(y_true, y_pred, smooth=1e-7):
+    '''
+    Dice coefficient for 2 categories. Ignores background pixel label 0
+    Pass to model as metric during compile statement
+    '''
+    y_true_f = K.flatten(K.one_hot(K.cast(y_true, 'int32'), num_classes=2)[..., 1:])
+    y_pred_f = K.flatten(y_pred[..., 1:])
+    intersect = K.sum(y_true_f * y_pred_f, axis=-1)
+    denom = K.sum(y_true_f + y_pred_f, axis=-1)
+    return K.mean((2. * intersect / (denom + smooth)))
 
 
 def loss_charbonnier(y_real, x_out, alpha=0.45, epsilon=0.001):
