@@ -52,14 +52,22 @@ class ITrainer():
         self.sess = tf.Session(config=config)
 
         self.summaries_val = []
+        self.summaries_val_2 = []
         self.summaries_vis = []
+        self.summaries_vis_2 = []
         self.summaries_vis_one = []
+        self.summaries_vis_one_2 = []
         self.summaries = []
+        self.summaries_2 = []
 
         self.summary_val = None
+        self.summary_val_2 = None
         self.summary_vis = None
+        self.summary_vis_2 = None
         self.summary_vis_one = None
+        self.summary_vis_one_2 = None
         self.summary = None
+        self.summary_2 = None
 
         self.model_dir = 'model'
         self.sample_dir = 'samples'
@@ -107,11 +115,19 @@ class ITrainer():
             self.summaries_vis.extend(model.summary_vis)
             self.summaries_vis_one.extend(model.summary_vis_one)
             self.summaries.extend(model.summary)
+            self.summaries_val_2.extend(model.summary_val_2)
+            self.summaries_vis_2.extend(model.summary_vis_2)
+            self.summaries_vis_one_2.extend(model.summary_vis_one_2)
+            self.summaries_2.extend(model.summary_2)
 
         self.summary_val = tf.summary.merge([self.summaries_val])
         self.summary_vis = tf.summary.merge([self.summaries_vis])
         self.summary_vis_one = tf.summary.merge([self.summaries_vis_one])
         self.summary = tf.summary.merge([self.summaries])
+        self.summary_val_2 = tf.summary.merge([self.summaries_val_2])
+        self.summary_vis_2 = tf.summary.merge([self.summaries_vis_2])
+        self.summary_vis_one_2 = tf.summary.merge([self.summaries_vis_one_2])
+        self.summary_2 = tf.summary.merge([self.summaries_2])
 
         if self.params.make_summery_graph:
             self.writer = tf.summary.FileWriter(os.path.join(self.log_dir), self.sess.graph)

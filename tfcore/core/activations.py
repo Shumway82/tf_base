@@ -21,10 +21,11 @@ def get_activation(name='selu'):
                       'elu': tf.nn.elu,
                       'swish': swish,
                       'swish_e': e_swish,
-                      'linear': linear}
+                      'linear': linear,
+                      'none': linear}
     try:
         activation = dic_activation[name]
-        print(' [*] Activation:', activation.__name__)
+        #print(' [*] Activation:', activation.__name__)
         return activation
     except KeyError:
         raise KeyError(' [!] Activation: not found')

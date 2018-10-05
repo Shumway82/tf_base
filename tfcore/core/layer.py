@@ -7,7 +7,7 @@ from tensorflow.python.framework import ops, tensor_shape, tensor_util
 from tensorflow.python.layers import utils
 from tensorflow.python.ops import array_ops, math_ops, random_ops
 
-from tfcore.core.activations import selu, lrelu, linear
+from tfcore.core.activations import get_activation, selu, lrelu, linear
 from tfcore.core.normalization import *
 
 
@@ -27,7 +27,7 @@ def gaussian_noise_layer(input_layer, std):
     return input_layer
 
 
-def dropout(x, keep_prob, activation=linear, train=False):
+def dropout(x, keep_prob, activation='linear', train=False):
     '''
     Dropout-layer for normal activation and selu-activation
 
@@ -40,7 +40,7 @@ def dropout(x, keep_prob, activation=linear, train=False):
     # Return :
         output(Tensor): a 4D Tensor that is in exactly the same size as the input input_layer
     '''
-    if activation == selu:
+    if activation == 'selu':
         x = tf.cond(train,
                     lambda: dropout_selu(x, keep_prob, training=train),
                     lambda: x)
@@ -158,7 +158,7 @@ def spatial_dropout(x, p, seed, scope, is_training=True):
 
 def variable_with_weight_decay(name,
                                shape,
-                               activation=linear,
+                               activation='linear',
                                stddev=0.2,
                                initializer=None,
                                use_weight_decay=None,
@@ -186,22 +186,20 @@ def variable_with_weight_decay(name,
     else:
         f_in = np.prod(shape[:-1]) if len(shape) == 4 else shape[0]
 
-    # Calculate sdev for initialization according to activation function
-    if activation == tf.nn.selu:
-        sdev = math.sqrt(1 / f_in)
-    elif activation == tf.nn.relu or activation == tf.nn.leaky_relu or activation == tf.nn.relu6:
-        sdev = math.sqrt(2 / f_in)
-    elif activation == tf.nn.elu:
-        sdev = math.sqrt(1.5505188080679277 / f_in)
-    else:
-        sdev = stddev
+    activation_func = get_activation(activation)
+    if activation_func == tf.nn.selu:
+        stddev = math.sqrt(1 / f_in)
+    elif activation_func == tf.nn.relu or activation_func == tf.nn.leaky_relu or activation_func == tf.nn.relu6:
+        stddev = math.sqrt(2 / f_in)
+    elif activation_func == tf.nn.elu:
+        stddev = math.sqrt(1.5505188080679277 / f_in)
 
     if initializer is None:
-        initializer = tf.truncated_normal_initializer(stddev=sdev, dtype=tf.float32)
+        initializer = tf.truncated_normal_initializer(stddev=stddev, dtype=tf.float32)
 
     var = tf.get_variable(name=name,
                           shape=shape,
-                         # regularizer=tf.contrib.layers.l1_l2_regularizer(scale_l1=1.0, scale_l2=1.0),
+                          # regularizer=tf.contrib.layers.l1_l2_regularizer(scale_l1=1.0, scale_l2=1.0),
                           initializer=initializer,
                           trainable=trainable)
 
@@ -211,7 +209,7 @@ def variable_with_weight_decay(name,
     return var
 
 
-def avg_pool(x, r=2, s=2):
+def avg_pool(x, radius=2, stride=2, padding="SAME", name=None):
     """
     Average polling-layer.
 
@@ -223,10 +221,13 @@ def avg_pool(x, r=2, s=2):
     # Return
         A Tensor of format specified by data_format. The max pooled output tensor.
     """
-    return tf.nn.avg_pool(x, ksize=[1, r, r, 1], strides=[1, s, s, 1], padding="SAME")
+    net = tf.nn.avg_pool(x, ksize=[1, radius, radius, 1], strides=[1, stride, stride, 1], padding=padding, name=name)
+    print('Avg_Pool: ' + x.name + ' = ' + str(x.get_shape()) + ' -> ' + name + ' shape Out=' + str(net.get_shape()) +
+           ', radius: ' + str(radius) + ', stride: ' + str(stride))
+    return net
 
 
-def max_pool(x, r=2, s=2, name=None):
+def max_pool(x, radius=2, stride=2, name=None):
     """
         Max polling-layer.
 
@@ -238,7 +239,10 @@ def max_pool(x, r=2, s=2, name=None):
         # Return
             A Tensor of format specified by data_format. The max pooled output tensor.
     """
-    return tf.nn.max_pool(x, ksize=[1, r, r, 1], strides=[1, s, s, 1], padding="SAME", name=name)
+    net = tf.nn.max_pool(x, ksize=[1, radius, radius, 1], strides=[1, stride, stride, 1], padding="SAME", name=name)
+    print('Max_Pool: ' + x.name + ' = ' + str(x.get_shape()) + ' -> ' + name + ' shape Out=' + str(net.get_shape()) +
+           ', radius: ' + str(radius) + ', stride: ' + str(stride))
+    return net
 
 
 def get_stddev(x, activation):
@@ -255,13 +259,15 @@ def get_stddev(x, activation):
 
     f_in = int(x.get_shape()[-1])
 
-    if activation == tf.nn.selu:
+    activation_func = get_activation(activation)
+
+    if activation_func == tf.nn.selu:
         stddev = math.sqrt(1.0 / f_in)
-    elif activation == tf.nn.relu or tf.nn.relu6:
+    elif activation_func == tf.nn.relu or activation_func == tf.nn.relu6:
         stddev = math.sqrt(2.0 / f_in)
-    elif activation == lrelu:
+    elif activation_func == lrelu:
         stddev = math.sqrt(2.0 / f_in)
-    elif activation == tf.nn.elu:
+    elif activation_func == tf.nn.elu:
         stddev = math.sqrt(1.5505188080679277 / f_in)
     else:
         stddev = math.sqrt(1.0 / f_in)
@@ -288,17 +294,16 @@ def conv2d(x,
            f_out,
            k_size=3,
            stride=1,
-           activation=linear,
+           activation='linear',
            use_bias=False,
            bias_init=0.0,
            init_scale=1.0,
            padding='SAME',
            use_weight_decay=False,
-           normalization=None,
-           use_spectral_norm=False,
-           use_preactivation=False,
+           normalization='None',
+           use_pre_activation=False,
            get_weights=False,
-           get_preactivation=False,
+           get_pre_activation=False,
            set_weight=None,
            use_pixel_norm=False,
            use_wscaling=False,
@@ -310,8 +315,12 @@ def conv2d(x,
     shape = [k_size, k_size, int(x.get_shape()[-1]), f_out]
     w_count = shape[0] * shape[1] * shape[2] * shape[3]
 
+    activation_func = get_activation(activation)
+    normalization_func = get_normalization(normalization)
+
     with tf.variable_scope(name):
         b = None
+        scale = 1.0
         if set_weight is None:
             w = variable_with_weight_decay('w',
                                            shape=shape,
@@ -330,10 +339,10 @@ def conv2d(x,
             scale = tf.reduce_mean(w ** 2)
             w = w / scale
 
-        if use_preactivation:
-            x = activation(x)
+        if use_pre_activation:
+            x = activation_func(x)
 
-        if normalization is spectral_normed_weight or use_spectral_norm:
+        if normalization is 'SN':
             if reuse:
                 update_collection = 'NO_OPS'
             conv = tf.nn.conv2d(x,
@@ -342,7 +351,7 @@ def conv2d(x,
                                 use_cudnn_on_gpu=True,
                                 padding=padding)
 
-        elif normalization is weight_norm:
+        elif normalization is 'WN':
             is_init = tf.Variable(True, name="init")
             g = tf.get_variable('g', shape=[f_out], dtype=tf.float32,
                                 initializer=tf.constant_initializer(1.), trainable=True)
@@ -392,26 +401,24 @@ def conv2d(x,
             pre_activation = tf.nn.bias_add(conv, b)
             w_count += f_out
 
-        if normalization is not None and \
-                normalization is not spectral_normed_weight and \
-                normalization is not weight_norm:
-            pre_activation = normalization(pre_activation, training=is_training, reuse=reuse, scope=name)
+        if normalization is 'BN' or normalization is 'IN' or normalization is 'LN':
+            pre_activation = normalization_func(pre_activation, training=is_training, reuse=reuse)
 
-        print(name + ': filter size: ' + str(k_size) + 'x' + str(k_size) + 'x' + str(
-            conv.get_shape()[3]) + ' shape In=' + str(
-            x.get_shape()) + ' shape Out=' + str(conv.get_shape()) + ' weights=' + str(w_count))
+        print('Conv2D: ' + x.name + ' = ' + str(x.get_shape()) + ' -> ' + name + ' shape Out=' + str(conv.get_shape()) +
+              ': f_out: ' + str(k_size) + 'x' + str(k_size) + 'x' + str(conv.get_shape()[3]) +
+              ' weights=' + str(w_count) + ' act: ' + activation + ' norm: ' + normalization)
 
-        if not use_preactivation:
-            conv = activation(pre_activation)
+        if not use_pre_activation:
+            conv = activation_func(pre_activation)
 
         if use_pixel_norm:
             conv = pixel_norm(conv)
 
         if get_weights and use_bias:
-            return conv, w, biases
+            return conv, w, b
         elif get_weights:
             return conv, w
-        elif get_preactivation:
+        elif get_pre_activation:
             return conv, pre_activation
         else:
             return conv
@@ -422,91 +429,153 @@ def deconv2d(x,
              output_shape=None,
              k_size=3,
              stride=1,
-             activation=linear,
+             activation='linear',
              use_bias=False,
              bias_init=0.0,
+             init_scale=1.0,
              padding='SAME',
-             normalization=None,
-             is_training=False,
-             trainable=True,
              use_weight_decay=False,
-             use_preactivation=False,
+             normalization='None',
+             use_pre_activation=False,
              get_weights=False,
-             get_preactivation=False,
+             get_pre_activation=False,
              set_weight=None,
              use_pixel_norm=False,
              use_wscaling=False,
+             is_training=False,
+             trainable=True,
+             reuse=False,
+             update_collection=SPECTRAL_NORM_UPDATE_OPS,
              name="deconv2d"):
+
     shape = [k_size, k_size, f_out, int(x.get_shape()[-1])]
     w_count = shape[0] * shape[1] * shape[2] * shape[3]
 
     if output_shape is None:
         output_shape = []
-        output_shape.append(tf.shape(x)[0]) if tf.shape(x)[0] is tf.Dimension(None) else output_shape.append(tf.shape(x)[0])
-        output_shape.append(tf.shape(x)[1]) if tf.shape(x)[1] is tf.Dimension(None) else output_shape.append(int(x.get_shape()[1] * stride))
-        output_shape.append(tf.shape(x)[2]) if tf.shape(x)[2] is tf.Dimension(None) else output_shape.append(int(x.get_shape()[2] * stride))
+        output_shape.append(tf.shape(x)[0]) if tf.shape(x)[0] is tf.Dimension(None) else output_shape.append(
+            tf.shape(x)[0])
+        output_shape.append(tf.shape(x)[1]) if tf.shape(x)[1] is tf.Dimension(None) else output_shape.append(
+            int(x.get_shape()[1] * stride))
+        output_shape.append(tf.shape(x)[2]) if tf.shape(x)[2] is tf.Dimension(None) else output_shape.append(
+            int(x.get_shape()[2] * stride))
         output_shape.append(tf.shape(x)[3]) if tf.shape(x)[3] is tf.Dimension(None) else output_shape.append(int(f_out))
 
+    activation_func = get_activation(activation)
+    normalization_func = get_normalization(normalization)
+
     with tf.variable_scope(name):
+        b = None
+        scale = 1.0
 
         if set_weight is None:
             w = variable_with_weight_decay('w',
                                            shape=shape,
                                            activation=activation,
                                            stddev=0.2,
-                                           is_conv_transposed=True,
-                                           use_weight_decay=use_weight_decay)
+                                           use_weight_decay=use_weight_decay,
+                                           trainable=trainable)
+
+            b = variable_with_weight_decay('biases',
+                                           shape=[f_out],
+                                           initializer=tf.constant_initializer(bias_init))
         else:
             w = set_weight
 
         if use_wscaling:
-            w_scale = tf.reduce_mean(w ** 2)
-            w = w / w_scale
+            scale = tf.reduce_mean(w ** 2)
+            w = w / scale
 
-        if use_preactivation:
-            x = activation(x)
+        if use_pre_activation:
+            x = activation_func(x)
 
-        deconv = tf.nn.conv2d_transpose(x,
-                                        w,
-                                        output_shape=output_shape,
-                                        strides=[1, stride, stride, 1],
-                                        padding=padding)
-        pre_activation = deconv
+        if normalization is 'SN':
+            if reuse:
+                update_collection = 'NO_OPS'
+
+            conv = tf.nn.conv2d_transpose(x,
+                                          spectral_normed_weight(w, update_collection=update_collection),
+                                          output_shape=output_shape,
+                                          strides=[1, stride, stride, 1],
+                                          padding=padding)
+        elif normalization is 'WN':
+            is_init = tf.Variable(True, name="init")
+            g = tf.get_variable('g', shape=[f_out], dtype=tf.float32,
+                                initializer=tf.constant_initializer(1.), trainable=True)
+
+            def init(x, w, b, g):
+                v_norm = tf.nn.l2_normalize(w, [0, 1, 2])
+                x = tf.nn.conv2d_transpose(x,
+                                           v_norm,
+                                           output_shape=output_shape,
+                                           strides=[1, stride, stride, 1],
+                                           padding=padding)
+
+                m_init, v_init = tf.nn.moments(x, [0, 1, 2])
+                scale_init = init_scale / tf.sqrt(v_init + 1e-08)
+                g = g.assign(scale_init)
+                if use_bias:
+                    b = b.assign(-m_init * scale_init)
+                x = tf.reshape(scale_init, [1, 1, 1, f_out]) * (x - tf.reshape(m_init, [1, 1, 1, f_out]))
+                is_init.assign(False)
+                return x, g
+
+            def train(x, w, b, g):
+                # use weight normalization (Salimans & Kingma, 2016)
+                W = tf.reshape(g, [1, 1, 1, f_out]) * tf.nn.l2_normalize(w, [0, 1, 2])
+
+                # calculate convolutional layer output
+                x = tf.nn.conv2d_transpose(x,
+                                           W,
+                                           output_shape=output_shape,
+                                           strides=[1, stride, stride, 1],
+                                           padding=padding)
+
+                return x, g
+
+            conv, g = tf.cond(is_init,
+                              lambda: init(x, w, b, g),
+                              lambda: train(x, w, b, g))
+
+        else:
+            conv = tf.nn.conv2d_transpose(x,
+                                          w,
+                                          output_shape=output_shape,
+                                          strides=[1, stride, stride, 1],
+                                          padding=padding)
+        pre_activation = conv
 
         if use_wscaling:
-            deconv = deconv * w_scale
+            conv = conv * scale
 
         if use_bias:
-            biases = variable_with_weight_decay('biases',
-                                                shape=[f_out],
-                                                initializer=tf.constant_initializer(bias_init))
-            pre_activation = tf.nn.bias_add(deconv, biases)
+            pre_activation = tf.nn.bias_add(conv, b)
             w_count += f_out
 
-        if normalization is not None:
-            pre_activation = normalization(pre_activation, training=is_training)
+        if normalization is 'BN' or normalization is 'IN' or normalization is 'LN':
+            pre_activation = normalization_func(pre_activation, training=is_training, reuse=reuse, scope=name)
 
         print(name + ': filter size: ' + str(k_size) + 'x' + str(k_size) + 'x' + str(
-            deconv.get_shape()[3]) + ' shape In=' + str(
-            x.get_shape()) + ' shape Out=' + str(deconv.get_shape()) + ' weights=' + str(w_count))
+            conv.get_shape()[3]) + ' shape In=' + str(
+            x.get_shape()) + ' shape Out=' + str(conv.get_shape()) + ' weights=' + str(w_count))
 
-        if not use_preactivation:
-            deconv = activation(pre_activation)
+        if not use_pre_activation:
+            conv = activation_func(pre_activation)
 
         if use_pixel_norm:
-            deconv = pixel_norm(deconv)
+            conv = pixel_norm(conv)
 
         if get_weights and use_bias:
-            return deconv, w, biases
+            return conv, w, b
         elif get_weights:
-            return deconv, w
-        elif get_preactivation:
-            return deconv, pre_activation
+            return conv, w
+        elif get_pre_activation:
+            return conv, pre_activation
         else:
-            return deconv
+            return conv
 
 
-def dense_layer(x, f_out, bias_start=0.0, activation=linear, name='dense'):
+def dense_layer(x, f_out, bias_start=0.0, activation='linear', name='dense'):
     """
     Tensorflow Dense-Layer
 
@@ -521,10 +590,11 @@ def dense_layer(x, f_out, bias_start=0.0, activation=linear, name='dense'):
         A 2D Tensor of the size of f_out.
     """
 
-    stddev = get_stddev(x, activation)
+    activation_func = get_activation(activation)
+    stddev = get_stddev(x, activation_func)
     print(name + ': shape = ' + str(f_out) + ' stddev = ' + str("%.8f" % stddev))
     return tf.layers.dense(x, f_out,
-                           activation=activation,
+                           activation=activation_func,
                            kernel_initializer=tf.random_normal_initializer(stddev=stddev),
                            bias_initializer=tf.constant_initializer(bias_start),
                            name=name)
@@ -533,11 +603,11 @@ def dense_layer(x, f_out, bias_start=0.0, activation=linear, name='dense'):
 def linear_layer(x,
                  f_out,
                  bias_start=0.0,
-                 activation=linear,
+                 activation='linear',
                  with_w=False,
                  weights=None,
                  bias=None,
-                 normalization=None,
+                 normalization='None',
                  use_weight_decay=False,
                  is_training=False,
                  reuse=False,
@@ -561,7 +631,8 @@ def linear_layer(x,
 
     shape = [int(x.get_shape()[-1])]
     stddev = get_stddev(x, activation)
-
+    activation_func = get_activation(activation)
+    normalization_func = get_normalization(normalization)
     with tf.variable_scope(scope):
 
         if weights is None:
@@ -576,14 +647,14 @@ def linear_layer(x,
                                               shape=[f_out],
                                               initializer=tf.constant_initializer(bias_start))
         pre_activation = tf.matmul(x, weights) + bias
-        if normalization is not None and \
-                normalization is not spectral_normed_weight and \
-                normalization is not weight_norm:
-            pre_activation = normalization(pre_activation, training=is_training, reuse=reuse, scope=scope)
+
+        if normalization is 'BN' or normalization is 'IN' or normalization is 'LN':
+            pre_activation = normalization_func(pre_activation, training=is_training, reuse=reuse, scope=scope)
+
         if with_w:
-            return activation(pre_activation), weights, bias
+            return activation_func(pre_activation), weights, bias
         else:
-            return activation(pre_activation)
+            return activation_func(pre_activation)
 
 
 def upscale_nearest_neighbor(x, f_size, is_training, resize_factor=2):
@@ -609,7 +680,7 @@ def upscale_nearest_neighbor(x, f_size, is_training, resize_factor=2):
                  stride=resize_factor,
                  is_training=is_training,
                  name='upscale_NN')
-    x = max_pool(x, r=resize_factor, s=1)
+    x = max_pool(x, radius=resize_factor, stride=1)
     x -= 2
     return x
 

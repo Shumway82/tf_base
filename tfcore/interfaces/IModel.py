@@ -50,6 +50,10 @@ class IModel():
         self.summary_vis_one = []
         self.summary_val = []
         self.summary = []
+        self.summary_vis_2 = []
+        self.summary_vis_one_2 = []
+        self.summary_val_2 = []
+        self.summary_2 = []
         self.input_stage = ''
         self.output_stage = ''
         self.max_images = 6

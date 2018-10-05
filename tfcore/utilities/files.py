@@ -56,3 +56,13 @@ def get_paths(directory, exts, ignore_empty):
 def _get_files_with_ext(directory, extension):
     reg = os.path.join(directory, "*." + extension)
     return list(glob.glob(reg, recursive=False))
+
+
+def get_filename(idx, filename='', extension='.png', decimals=5):
+    for n in range(decimals, -1, -1):
+        if idx < pow(10, n):
+            filename += '0'
+        else:
+            filename += str(idx)
+            break
+    return filename + extension

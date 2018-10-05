@@ -14,6 +14,23 @@ import scipy
 import tensorflow as tf
 from tensorflow.contrib.framework.python.framework import checkpoint_utils
 
+def multiple_one_hot(cat_int_tensor, depth_list):
+    """Creates one-hot-encodings for multiple categorical attributes and
+    concatenates the resulting encodings
+
+    Args:
+        cat_tensor (tf.Tensor): tensor with mutiple columns containing categorical features
+        depth_list (list): list of the no. of values (depth) for each categorical
+
+    Returns:
+        one_hot_enc_tensor (tf.Tensor): concatenated one-hot-encodings of cat_tensor
+    """
+    one_hot_enc_tensor = tf.one_hot(cat_int_tensor[:,0], depth_list[0], axis=1)
+    for col in range(1, len(depth_list)):
+        add = tf.one_hot(cat_int_tensor[:,col], depth_list[col], axis=1)
+        one_hot_enc_tensor = tf.concat([one_hot_enc_tensor, add], axis=1)
+
+    return one_hot_enc_tensor
 
 def get_patches(input, patch_size=64, stride=0.0):
     size = [1, patch_size,patch_size, 1]
@@ -30,7 +47,6 @@ def conv_cond_concat(x, y):
     # Return
         4D-Tensor
     """
-
 
     x_shapes = x.get_shape()
     y_shapes = y.get_shape()

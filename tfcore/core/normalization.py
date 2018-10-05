@@ -1,5 +1,5 @@
 import tensorflow as tf
-from tensorflow.contrib.layers import instance_norm, batch_norm, layer_norm
+from tensorflow.contrib.layers import instance_norm, layer_norm, group_norm
 import warnings
 
 
@@ -19,8 +19,9 @@ def get_normalization(function_name):
                          'IN': instance_norm_tf,
                          'SN': spectral_normed_weight,
                          'LN': layer_norm_tf,
+                         'GN': group_norm_tf,
                          'WN': weight_norm,
-                         'None': None}
+                         'None': none_normalization}
     return dic_normalization.get(function_name, None)
 
 
@@ -51,8 +52,9 @@ def spectral_normed_weight(W, u=None, num_iters=1, update_collection=None, with_
                    u, tf.zeros(dtype=tf.float32, shape=[1, W_reshaped.shape.as_list()[0]]))
     )
     if update_collection is None:
-        warnings.warn('Setting update_collection to None will make u being updated every W execution. This maybe undesirable'
-                      '. Please consider using a update collection instead.')
+        warnings.warn(
+            'Setting update_collection to None will make u being updated every W execution. This maybe undesirable'
+            '. Please consider using a update collection instead.')
         sigma = tf.matmul(tf.matmul(v_final, W_reshaped), tf.transpose(u_final))[0, 0]
         # sigma = tf.reduce_sum(tf.matmul(u_final, tf.transpose(W_reshaped)) * v_final)
         W_bar = W_reshaped / sigma
@@ -72,15 +74,22 @@ def spectral_normed_weight(W, u=None, num_iters=1, update_collection=None, with_
     else:
         return W_bar
 
+
+def none_normalization(x, training=False, reuse=False, scope=None):
+    return x
+
+
 def weight_norm():
-    print (' [*] Weight-Norm ')
+    print(' [*] Weight-Norm ')
+
 
 def _instance_norm(x, training=False, reuse=False, scope=None):
     with tf.variable_scope('instance_norm', reuse=reuse):
         eps = 1e-5
         mean, sigma = tf.nn.moments(x, [1, 2], keep_dims=True)
         normalized = (x - mean) / (tf.sqrt(sigma) + eps)
-        return  normalized
+        return normalized
+
 
 def _instance_norm(x):
     """Adapted from https://github.com/hardikbansal/CycleGAN."""
@@ -95,14 +104,18 @@ def _instance_norm(x):
 
         return out
 
+
 def instance_norm_tf(x, training=False, reuse=False, scope=None):
     return instance_norm(x, epsilon=1e-5, reuse=False, scope=scope)
 
 
 def batch_norm_tf(x, training=False, reuse=False, scope=None):
-    return tf.cond(training,
-                     lambda: batch_norm(x, decay=0.99, is_training=True, reuse=False, center=True, scale=True, scope=scope),
-                     lambda: batch_norm(x, decay=0.99, is_training=False, reuse=False, center=True, scale=True, scope=scope))
+    return tf.layers.batch_normalization(x, momentum=0.9, reuse=reuse, training=training)
+
+
+def group_norm_tf(x, training=False, reuse=False, scope=None):
+    return group_norm(x, reuse=reuse)
+
 
 def layer_norm_tf(x, training=False, reuse=False, scope=None):
     return layer_norm(x, reuse=False, scope=scope)
