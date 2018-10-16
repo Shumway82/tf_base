@@ -161,7 +161,7 @@ def variable_with_weight_decay(name,
                                activation='linear',
                                stddev=0.2,
                                initializer=None,
-                               use_weight_decay=None,
+                               L2_weight=0.0001,
                                is_conv_transposed=False,
                                trainable=True):
     """
@@ -199,13 +199,9 @@ def variable_with_weight_decay(name,
 
     var = tf.get_variable(name=name,
                           shape=shape,
-                          # regularizer=tf.contrib.layers.l1_l2_regularizer(scale_l1=1.0, scale_l2=1.0),
+                          regularizer=tf.contrib.layers.l2_regularizer(L2_weight),
                           initializer=initializer,
                           trainable=trainable)
-
-    if use_weight_decay is not None:
-        weight_decay = tf.multiply(tf.nn.l2_loss(var), use_weight_decay, name='weight_loss')
-        tf.add_to_collection('losses', weight_decay)
     return var
 
 
@@ -299,7 +295,7 @@ def conv2d(x,
            bias_init=0.0,
            init_scale=1.0,
            padding='SAME',
-           use_weight_decay=False,
+           L2_weight=0.0001,
            normalization='None',
            use_pre_activation=False,
            get_weights=False,
@@ -326,7 +322,7 @@ def conv2d(x,
                                            shape=shape,
                                            activation=activation,
                                            stddev=0.2,
-                                           use_weight_decay=use_weight_decay,
+                                           L2_weight=L2_weight,
                                            trainable=trainable)
 
             b = variable_with_weight_decay('biases',
@@ -434,7 +430,7 @@ def deconv2d(x,
              bias_init=0.0,
              init_scale=1.0,
              padding='SAME',
-             use_weight_decay=False,
+             L2_weight=0.0001,
              normalization='None',
              use_pre_activation=False,
              get_weights=False,
@@ -473,7 +469,7 @@ def deconv2d(x,
                                            shape=shape,
                                            activation=activation,
                                            stddev=0.2,
-                                           use_weight_decay=use_weight_decay,
+                                           L2_weight=L2_weight,
                                            trainable=trainable)
 
             b = variable_with_weight_decay('biases',
@@ -608,7 +604,7 @@ def linear_layer(x,
                  weights=None,
                  bias=None,
                  normalization='None',
-                 use_weight_decay=False,
+                 L2_weight=0.0001,
                  is_training=False,
                  reuse=False,
                  scope='linear'):
@@ -640,7 +636,7 @@ def linear_layer(x,
                                                  shape=[shape[-1], f_out],
                                                  activation=activation,
                                                  stddev=stddev,
-                                                 use_weight_decay=use_weight_decay,
+                                                 L2_weight=L2_weight,
                                                  trainable=True)
         if bias is None:
             bias = variable_with_weight_decay('biases',

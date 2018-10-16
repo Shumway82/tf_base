@@ -14,6 +14,43 @@ import scipy
 import tensorflow as tf
 from tensorflow.contrib.framework.python.framework import checkpoint_utils
 
+
+def reduce_var(x, axis=None, keepdims=False):
+    """Variance of a tensor, alongside the specified axis.
+
+    # Arguments
+        x: A tensor or variable.
+        axis: An integer, the axis to compute the variance.
+        keepdims: A boolean, whether to keep the dimensions or not.
+            If `keepdims` is `False`, the rank of the tensor is reduced
+            by 1. If `keepdims` is `True`,
+            the reduced dimension is retained with length 1.
+
+    # Returns
+        A tensor with the variance of elements of `x`.
+    """
+    m = tf.reduce_mean(x, axis=axis, keep_dims=True)
+    devs_squared = tf.square(x - m)
+    return tf.reduce_mean(devs_squared, axis=axis, keep_dims=keepdims)
+
+
+def reduce_std(x, axis=None, keepdims=False):
+    """Standard deviation of a tensor, alongside the specified axis.
+
+    # Arguments
+        x: A tensor or variable.
+        axis: An integer, the axis to compute the standard deviation.
+        keepdims: A boolean, whether to keep the dimensions or not.
+            If `keepdims` is `False`, the rank of the tensor is reduced
+            by 1. If `keepdims` is `True`,
+            the reduced dimension is retained with length 1.
+
+    # Returns
+        A tensor with the standard deviation of elements of `x`.
+    """
+    return tf.sqrt(reduce_var(x, axis=axis, keepdims=keepdims))
+
+
 def multiple_one_hot(cat_int_tensor, depth_list):
     """Creates one-hot-encodings for multiple categorical attributes and
     concatenates the resulting encodings
@@ -25,18 +62,20 @@ def multiple_one_hot(cat_int_tensor, depth_list):
     Returns:
         one_hot_enc_tensor (tf.Tensor): concatenated one-hot-encodings of cat_tensor
     """
-    one_hot_enc_tensor = tf.one_hot(cat_int_tensor[:,0], depth_list[0], axis=1)
+    one_hot_enc_tensor = tf.one_hot(cat_int_tensor[:, 0], depth_list[0], axis=1)
     for col in range(1, len(depth_list)):
-        add = tf.one_hot(cat_int_tensor[:,col], depth_list[col], axis=1)
+        add = tf.one_hot(cat_int_tensor[:, col], depth_list[col], axis=1)
         one_hot_enc_tensor = tf.concat([one_hot_enc_tensor, add], axis=1)
 
     return one_hot_enc_tensor
 
+
 def get_patches(input, patch_size=64, stride=0.0):
-    size = [1, patch_size,patch_size, 1]
+    size = [1, patch_size, patch_size, 1]
     patch_stride = [1, int(patch_size * (1 - stride)), int(patch_size * (1.0 - stride)), 1]
     patches = tf.extract_image_patches(input, size, patch_stride, [1, 1, 1, 1], 'VALID')
     return tf.reshape(patches, [-1, patch_size, patch_size, 3])
+
 
 def conv_cond_concat(x, y):
     """ Concatenate conditioning vector on feature map axis.
@@ -510,6 +549,7 @@ def to_numpy(tf_function,
             return output_list[0]
         else:
             return tuple(output_list)
+
     return np_function
 
 
